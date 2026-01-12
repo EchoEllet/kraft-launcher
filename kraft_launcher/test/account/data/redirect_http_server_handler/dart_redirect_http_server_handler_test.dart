@@ -188,7 +188,7 @@ void main() {
 
     group('exception-to-failure mapping', () {
       test(
-        'returns $UnknownFailure when $SocketException has null $OSError',
+        'returns $UnexpectedFailure when $SocketException has null $OSError',
         () async {
           fakeHttpServerFactory.throwsException = const SocketException(
             TestConstants.anyString,
@@ -199,7 +199,7 @@ void main() {
             port: _dummyPort,
           );
 
-          expect(result.failureOrNull, isA<UnknownFailure>());
+          expect(result.failureOrNull, isA<UnexpectedFailure>());
         },
       );
 
@@ -263,7 +263,7 @@ void main() {
       }
 
       test(
-        'returns $UnknownFailure for unhandled $SocketException cases',
+        'returns $UnexpectedFailure for unhandled $SocketException cases',
         () async {
           fakeHttpServerFactory.throwsException = const SocketException(
             TestConstants.anyString,
@@ -274,7 +274,7 @@ void main() {
             port: _dummyPort,
           );
 
-          expect(result.failureOrNull, isA<UnknownFailure>());
+          expect(result.failureOrNull, isA<UnexpectedFailure>());
         },
       );
     });

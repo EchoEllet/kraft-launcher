@@ -281,11 +281,41 @@ abstract class AppLocalizations {
   /// **'Remove Account'**
   String get removeAccount;
 
-  /// Fallback error message for unexpected errors during any operation.
+  /// (DEPRECATED, use unexpectedFailureMessage instead) Fallback error message for unexpected errors during any operation.
   ///
   /// In en, this message translates to:
   /// **'Unexpected error: {message}.'**
   String unexpectedError(String message);
+
+  /// Fallback message shown to the user when an unexpected exception occurs that was not specifically handled. This is not meant to indicate a bug in the app, but to provide a generic, user-friendly message for recoverable issues or unknown exceptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get unexpectedFailureMessage;
+
+  /// No description provided for @minecraftServicesLoginUnhandledServerResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Login failed due to an error from Minecraft services. Please try again.'**
+  String get minecraftServicesLoginUnhandledServerResponse;
+
+  /// No description provided for @minecraftServicesLoginInternalServerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Login failed due to an internal server error from Minecraft services. Please try again.'**
+  String get minecraftServicesLoginInternalServerError;
+
+  /// No description provided for @minecraftServicesLoginUnexpectedResponseDataStructure.
+  ///
+  /// In en, this message translates to:
+  /// **'Login failed due to an unexpected response structure from Minecraft services. Please make sure the launcher is up to date and try again.'**
+  String get minecraftServicesLoginUnexpectedResponseDataStructure;
+
+  /// No description provided for @minecraftServicesLoginInvalidResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Login failed due to an invalid response from Minecraft services. Please try again later.'**
+  String get minecraftServicesLoginInvalidResponse;
 
   /// Shown when the login process is redirected without a 'code' parameter, indicating that the Microsoft authorization code is missing or was manually accessed.
   ///
@@ -659,12 +689,6 @@ abstract class AppLocalizations {
   /// **'Request limit reached while communicating with Minecraft servers. Please try again shortly.'**
   String get minecraftRequestLimitError;
 
-  /// No description provided for @unexpectedMinecraftApiError.
-  ///
-  /// In en, this message translates to:
-  /// **'Unexpected error while communicating with Minecraft servers: {message}. Please try again later.'**
-  String unexpectedMinecraftApiError(Object message);
-
   /// No description provided for @unexpectedMicrosoftApiError.
   ///
   /// In en, this message translates to:
@@ -951,7 +975,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Minecraft services are currently unavailable. Please try again in a few minutes.'**
-  String get minecraftAccountApiUnavailable;
+  String get minecraftServicesApiUnavailable;
 
   /// Shown when the local HTTP server used to receive Microsoft's redirect during auth code login cannot start because the selected port is already in use. This prevents the app from receiving the login response from Microsoft.
   ///
@@ -962,14 +986,32 @@ abstract class AppLocalizations {
   /// Shown when the local HTTP server used to receive Microsoft's redirect cannot start because the operating system denied permission. This can be caused by firewall rules, antivirus software, admin restrictions, or security policies.
   ///
   /// In en, this message translates to:
-  /// **'Unable to start the local server required for login due to system restrictions: {details}'**
-  String authCodeServerStartFailurePermissionDenied(String details);
+  /// **'Unable to start the local server required for login due to system restrictions.'**
+  String get authCodeServerStartFailurePermissionDenied;
 
   /// Shown when the local HTTP server, used to receive Microsoft's redirect after sign-in, fails to start due to an unknown or unclassified error.
   ///
   /// In en, this message translates to:
-  /// **'Unable to start the local server required for login due to an unexpected error: {message}'**
-  String authCodeServerStartFailureUnknown(String message);
+  /// **'Unable to start the local server required for login due to an unexpected error.'**
+  String get authCodeServerStartFailureUnexpected;
+
+  /// Shown to the user when the app cannot reach the internet or server due to network issues.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed. Please check your internet connection and try again.'**
+  String get connectionFailure;
+
+  /// Label for a button shown when an unclear error occurs (e.g., connection failures) and the technical details are not user-friendly. Tapping this button opens a dialog displaying the full technical error details.
+  ///
+  /// In en, this message translates to:
+  /// **'Show details'**
+  String get showErrorDetailsButton;
+
+  /// Title of the dialog that shows detailed technical information about an expected error for debugging or reporting purposes
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get technicalErrorDetailsDialogTitle;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -3,14 +3,15 @@ import 'package:kraft_launcher/account/data/image_cache_service/image_cache_serv
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api.dart';
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api_exceptions.dart'
     as microsoft_auth_api_exceptions;
-import 'package:kraft_launcher/account/data/minecraft_account_api/minecraft_account_api.dart';
 import 'package:kraft_launcher/account/logic/launcher_minecraft_account/minecraft_account.dart';
 import 'package:kraft_launcher/account/logic/microsoft/minecraft/account_refresher/minecraft_account_refresher.dart';
 import 'package:kraft_launcher/account/logic/microsoft/minecraft/account_refresher/minecraft_account_refresher_exceptions.dart'
-    as minecraft_account_refresher_exceptions;
+    as refresher_exceptions;
 import 'package:kraft_launcher/account/logic/microsoft/minecraft/account_resolver/minecraft_account_resolver.dart';
 import 'package:kraft_launcher/account/logic/minecraft_skin_ext.dart';
 import 'package:kraft_launcher/common/constants/constants.dart';
+import 'package:minecraft_services_repository/minecraft_services_repository.dart';
+import 'package:minecraft_services_repository/test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
 
@@ -23,7 +24,7 @@ import '../../../../data/minecraft_dummy_accounts.dart';
 void main() {
   late _MockImageCacheService mockImageCacheService;
   late MockMicrosoftAuthApi mockMicrosoftAuthApi;
-  late MockMinecraftAccountApi mockMinecraftAccountApi;
+  late FakeMinecraftServicesRepository fakeMinecraftServicesRepository;
   late _MockMinecraftAccountResolver mockAccountResolver;
 
   late MinecraftAccountRefresher refresher;
@@ -31,13 +32,13 @@ void main() {
   setUp(() {
     mockImageCacheService = _MockImageCacheService();
     mockMicrosoftAuthApi = MockMicrosoftAuthApi();
-    mockMinecraftAccountApi = MockMinecraftAccountApi();
+    fakeMinecraftServicesRepository = FakeMinecraftServicesRepository();
     mockAccountResolver = _MockMinecraftAccountResolver();
 
     refresher = MinecraftAccountRefresher(
       imageCacheService: mockImageCacheService,
       microsoftAuthApi: mockMicrosoftAuthApi,
-      minecraftAccountApi: mockMinecraftAccountApi,
+      minecraftServicesRepository: fakeMinecraftServicesRepository,
       accountResolver: mockAccountResolver,
     );
 
@@ -218,7 +219,7 @@ void main() {
     );
 
     test(
-      'throws ${minecraft_account_refresher_exceptions.InvalidMicrosoftRefreshTokenException} on ${microsoft_auth_api_exceptions.InvalidRefreshTokenException}',
+      'throws ${refresher_exceptions.InvalidMicrosoftRefreshTokenException} on ${microsoft_auth_api_exceptions.InvalidRefreshTokenException}',
       () async {
         when(
           () => mockAccountResolver.resolve(
@@ -234,9 +235,7 @@ void main() {
         await expectLater(
           refreshMicrosoftAccount(account: account),
           throwsA(
-            isA<
-                  minecraft_account_refresher_exceptions.InvalidMicrosoftRefreshTokenException
-                >()
+            isA<refresher_exceptions.InvalidMicrosoftRefreshTokenException>()
                 .having(
                   (e) => e.updatedAccount,
                   'updatedAccount',
@@ -256,14 +255,14 @@ void main() {
     );
 
     test(
-      'does not interact with $MinecraftAccountApi or unrelated methods of $MicrosoftAuthApi',
+      'does not interact with $MinecraftServicesRepository or unrelated methods of $MicrosoftAuthApi',
       () async {
         await refreshMicrosoftAccount();
 
         verify(() => mockMicrosoftAuthApi.getNewTokensFromRefreshToken(any()));
         verifyNoMoreInteractions(mockMicrosoftAuthApi);
 
-        verifyZeroInteractions(mockMinecraftAccountApi);
+        fakeMinecraftServicesRepository.verifyZeroInteractions();
       },
     );
   });
@@ -296,18 +295,15 @@ void main() {
           () => mockMicrosoftAuthApi.requestXSTSToken(any()),
         ).thenAnswer((_) async => dummyXboxLiveAuthTokenResponse);
 
-        when(
-          () => mockMinecraftAccountApi.loginToMinecraftWithXbox(
-            xstsToken: any(named: 'xstsToken'),
-            xstsUserHash: any(named: 'xstsUserHash'),
-          ),
-        ).thenAnswer(
-          (_) async => const MinecraftLoginResponse(
-            accessToken: TestConstants.anyString,
-            expiresIn: TestConstants.anyInt,
-            username: TestConstants.anyString,
-          ),
-        );
+        fakeMinecraftServicesRepository.whenAuthenticateWithXbox = (_) async {
+          return MinecraftServicesResult.success(
+            const MinecraftLoginResponse(
+              accessToken: TestConstants.anyString,
+              expiresIn: TestConstants.anyInt,
+              username: TestConstants.anyString,
+            ),
+          );
+        };
       });
 
       Future<MinecraftAccount> refreshWithExpiredMinecraftAccessToken({
@@ -356,14 +352,60 @@ void main() {
         },
       );
 
+      test('throws a ${refresher_exceptions.WrappedMinecraftServicesException} '
+          'with the original failure when Xbox authentication fails', () async {
+        // Avoid const to ensure unique instance for reference equality in test when using same().
+        // ignore: prefer_const_constructors
+        final expectedFailure = InvalidSkinImageDataFailure();
+        fakeMinecraftServicesRepository.whenAuthenticateWithXbox = (_) async {
+          return MinecraftServicesResult.failure(expectedFailure);
+        };
+
+        await expectLater(
+          refreshMinecraftAccessTokenIfExpired(),
+          throwsA(
+            isA<refresher_exceptions.WrappedMinecraftServicesException>()
+                .having((e) => e.wrapped, 'wrapped', same(expectedFailure)),
+          ),
+        );
+      });
+
       test(
-        'calls APIs correctly in order from Microsoft refresh token to Minecraft access token',
+        'emits refresh progress events in the correct sequence when refreshing',
+        () async {
+          final progressEvents = <RefreshMinecraftAccessTokenProgress>[];
+
+          await refreshWithExpiredMinecraftAccessToken(
+            onRefreshProgress: (progress) => progressEvents.add(progress),
+          );
+
+          expect(progressEvents, [
+            RefreshMinecraftAccessTokenProgress.refreshingMicrosoftTokens,
+            RefreshMinecraftAccessTokenProgress.requestingXboxToken,
+            RefreshMinecraftAccessTokenProgress.requestingXstsToken,
+            RefreshMinecraftAccessTokenProgress.loggingIntoMinecraft,
+          ]);
+        },
+      );
+
+      test(
+        'uses Microsoft refresh token from existing account to obtain a new access token',
+        () async {
+          final account = createMinecraftAccount();
+          await refreshWithExpiredMinecraftAccessToken(account: account);
+
+          verify(
+            () => mockMicrosoftAuthApi.getNewTokensFromRefreshToken(
+              account.microsoftAccountInfo!.microsoftRefreshToken.value!,
+            ),
+          );
+        },
+      );
+
+      test(
+        'obtains a new Microsoft access token and forwards it to Xbox Live token request',
         () async {
           const microsoftAccessToken = 'example-access-token';
-          const xboxLiveToken = 'example-xbox-live-token';
-
-          const xstsToken = 'example-xsts-token';
-          const xstsUserHash = 'example-xsts-user-hash';
 
           when(
             () => mockMicrosoftAuthApi.getNewTokensFromRefreshToken(any()),
@@ -374,6 +416,21 @@ void main() {
               expiresIn: TestConstants.anyInt,
             ),
           );
+
+          await refreshWithExpiredMinecraftAccessToken();
+
+          verify(
+            () =>
+                mockMicrosoftAuthApi.requestXboxLiveToken(microsoftAccessToken),
+          );
+        },
+      );
+
+      test(
+        'obtains a new Xbox live token and forwards it to XSTS token request',
+        () async {
+          const xboxLiveToken = 'example-xbox-live-token';
+
           when(
             () => mockMicrosoftAuthApi.requestXboxLiveToken(any()),
           ).thenAnswer(
@@ -382,59 +439,52 @@ void main() {
               userHash: TestConstants.anyString,
             ),
           );
+          await refreshWithExpiredMinecraftAccessToken();
+
+          verify(() => mockMicrosoftAuthApi.requestXSTSToken(xboxLiveToken));
+        },
+      );
+
+      test(
+        'obtains a new Xbox token and user hash and forwards it to Minecraft authentication request',
+        () async {
+          const expectedXstsToken = 'example-xsts-token';
+          const expectedXstsUserHash = 'example-xsts-user-hash';
+
           when(() => mockMicrosoftAuthApi.requestXSTSToken(any())).thenAnswer(
             (_) async => const XboxLiveAuthTokenResponse(
-              xboxToken: xstsToken,
-              userHash: xstsUserHash,
-            ),
-          );
-          when(
-            () => mockMinecraftAccountApi.loginToMinecraftWithXbox(
-              xstsToken: any(named: 'xstsToken'),
-              xstsUserHash: any(named: 'xstsUserHash'),
-            ),
-          ).thenAnswer(
-            (_) async => const MinecraftLoginResponse(
-              username: TestConstants.anyString,
-              accessToken: TestConstants.anyString,
-              expiresIn: TestConstants.anyInt,
+              xboxToken: expectedXstsToken,
+              userHash: expectedXstsUserHash,
             ),
           );
 
-          final progressEvents = <RefreshMinecraftAccessTokenProgress>[];
+          await refreshWithExpiredMinecraftAccessToken();
 
-          final account = createMinecraftAccount();
+          final call =
+              fakeMinecraftServicesRepository.authenticateWithXboxCalls.first;
 
-          await refreshWithExpiredMinecraftAccessToken(
-            account: account,
-            onRefreshProgress: (progress) => progressEvents.add(progress),
-          );
+          expect(call.xstsAccessToken, expectedXstsToken);
+          expect(call.xstsUserHash, expectedXstsUserHash);
+        },
+      );
 
-          expect(progressEvents, [
-            RefreshMinecraftAccessTokenProgress.refreshingMicrosoftTokens,
-            RefreshMinecraftAccessTokenProgress.requestingXboxToken,
-            RefreshMinecraftAccessTokenProgress.requestingXstsToken,
-            RefreshMinecraftAccessTokenProgress.loggingIntoMinecraft,
-          ]);
-          verifyInOrder([
-            () => mockMicrosoftAuthApi.getNewTokensFromRefreshToken(
-              any(
-                that: equals(
-                  account.microsoftAccountInfo!.microsoftRefreshToken.value,
-                ),
-              ),
-            ),
-            () =>
-                mockMicrosoftAuthApi.requestXboxLiveToken(microsoftAccessToken),
-            () => mockMicrosoftAuthApi.requestXSTSToken(xboxLiveToken),
-            () => mockMinecraftAccountApi.loginToMinecraftWithXbox(
-              xstsToken: xstsToken,
-              xstsUserHash: xstsUserHash,
-            ),
-          ]);
+      test(
+        'calls APIs with the expected number of times to prevent unnecessary or duplicate requests',
+        () async {
+          await refreshWithExpiredMinecraftAccessToken();
 
+          verify(
+            () => mockMicrosoftAuthApi.getNewTokensFromRefreshToken(any()),
+          ).called(1);
+          verify(
+            () => mockMicrosoftAuthApi.requestXboxLiveToken(any()),
+          ).called(1);
+          verify(() => mockMicrosoftAuthApi.requestXSTSToken(any())).called(1);
           verifyNoMoreInteractions(mockMicrosoftAuthApi);
-          verifyNoMoreInteractions(mockMinecraftAccountApi);
+
+          fakeMinecraftServicesRepository.verifyMethodCallCounts(
+            authenticateWithXbox: 1,
+          );
         },
       );
 
@@ -466,12 +516,9 @@ void main() {
             userHash: 'example-xsts-user-hash',
           ),
         );
-        when(
-          () => mockMinecraftAccountApi.loginToMinecraftWithXbox(
-            xstsToken: any(named: 'xstsToken'),
-            xstsUserHash: any(named: 'xstsUserHash'),
-          ),
-        ).thenAnswer((_) async => minecraftLoginResponse);
+        fakeMinecraftServicesRepository.whenAuthenticateWithXbox = (_) async {
+          return MinecraftServicesResult.success(minecraftLoginResponse);
+        };
 
         final expiredAccount = MinecraftDummyAccount.account;
         final fixedDateTime = DateTime(2030, 10, 5, 10);
@@ -585,7 +632,7 @@ void main() {
         await refreshWithValidMinecraftAccessToken();
 
         verifyZeroInteractions(mockAccountResolver);
-        verifyZeroInteractions(mockMinecraftAccountApi);
+        fakeMinecraftServicesRepository.verifyZeroInteractions();
         verifyZeroInteractions(mockMicrosoftAuthApi);
         verifyZeroInteractions(mockImageCacheService);
       });
@@ -597,7 +644,7 @@ void _testThrowsIfNeedsMicrosoftReAuth(
   Future<void> Function(MinecraftAccount account) performRefresh,
 ) {
   test(
-    'throws ${minecraft_account_refresher_exceptions.MicrosoftReAuthRequiredException} with correct $MicrosoftReauthRequiredReason if not null',
+    'throws ${refresher_exceptions.MicrosoftReAuthRequiredException} with correct $MicrosoftReauthRequiredReason if not null',
     () async {
       for (final reason in MicrosoftReauthRequiredReason.values) {
         await expectLater(
@@ -609,10 +656,11 @@ void _testThrowsIfNeedsMicrosoftReAuth(
             ),
           ),
           throwsA(
-            isA<
-                  minecraft_account_refresher_exceptions.MicrosoftReAuthRequiredException
-                >()
-                .having((e) => e.reason, 'reason', equals(reason)),
+            isA<refresher_exceptions.MicrosoftReAuthRequiredException>().having(
+              (e) => e.reason,
+              'reason',
+              equals(reason),
+            ),
           ),
         );
       }

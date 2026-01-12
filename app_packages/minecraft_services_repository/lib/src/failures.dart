@@ -11,7 +11,7 @@ final class ConnectionFailure extends MinecraftServicesFailure {
 }
 
 final class UnexpectedFailure extends MinecraftServicesFailure {
-  const UnexpectedFailure(String? message)
+  const UnexpectedFailure(String message)
     : super(
         'Unexpected failure while communicating with Minecraft services: $message',
       );

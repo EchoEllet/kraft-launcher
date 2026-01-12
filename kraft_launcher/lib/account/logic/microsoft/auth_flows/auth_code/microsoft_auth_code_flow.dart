@@ -62,6 +62,13 @@ import 'package:meta/meta.dart';
 /// * [MicrosoftOAuthFlowController], that manages both [MicrosoftAuthCodeFlow] and [MicrosoftDeviceCodeFlow].
 class MicrosoftAuthCodeFlow {
   MicrosoftAuthCodeFlow({
+    // TODO: Refactor MicrosoftAuthCodeFlow to be fully independent of MicrosoftAuthApi,
+    //  by returning only the auth code, and leaving the responsibility of using that auth code
+    //  to get the Microsoft access token and refresh token to the callers.
+    //  IMPORTANT_TO_FIX Actually, no, that would be inconsistent with MicrosoftDeviceCodeFlow,
+    //  The higher level componenet should gives the common result that is token response,
+    //  should this class gives the auth code or the token response? Higher level componenets
+    //  should not care.
     required MicrosoftAuthApi microsoftAuthApi,
     required RedirectHttpServerHandler redirectHttpServerHandler,
   }) : _redirectHttpServerHandler = redirectHttpServerHandler,

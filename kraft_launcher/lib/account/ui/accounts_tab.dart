@@ -12,14 +12,14 @@ import 'package:kraft_launcher/account/ui/account_list_tile.dart';
 import 'package:kraft_launcher/account/ui/login_with_microsoft_dialog.dart';
 import 'package:kraft_launcher/account/ui/microsoft_auth_cubit/microsoft_auth_cubit.dart';
 import 'package:kraft_launcher/account/ui/upsert_offline_account_dialog.dart';
-import 'package:kraft_launcher/account/ui/utils/minecraft_account_service_exception_messages.dart';
+import 'package:kraft_launcher/account/ui/utils/minecraft_account_error_messages.dart';
 import 'package:kraft_launcher/common/generated/assets.gen.dart';
 import 'package:kraft_launcher/common/ui/utils/build_context_ext.dart';
 import 'package:kraft_launcher/common/ui/utils/scaffold_messenger_ext.dart';
 import 'package:kraft_launcher/common/ui/widgets/info_text_with_lottie.dart';
 import 'package:kraft_launcher/common/ui/widgets/search_field.dart';
 import 'package:kraft_launcher/common/ui/widgets/split_view.dart';
-import 'package:kraft_launcher/common/ui/widgets/unknown_error.dart';
+import 'package:kraft_launcher/common/ui/widgets/errors/unknown_error.dart';
 
 class AccountsTab extends StatelessWidget {
   const AccountsTab({super.key});
@@ -82,6 +82,8 @@ class AccountsTab extends StatelessWidget {
               },
             ),
       ),
+      onMicrosoftReAuthRequested: () =>
+          LoginWithMicrosoftDialog.show(context, isReAuthentication: true),
     );
   }
 }
@@ -229,9 +231,13 @@ class _EmptyAccounts extends StatelessWidget {
 /// even if the user switches accounts and [AccountDetails] is rebuilt
 /// since the refresh button is in [AccountDetails].
 class _AccountRefreshListener extends StatelessWidget {
-  const _AccountRefreshListener({required this.child});
+  const _AccountRefreshListener({
+    required this.child,
+    required this.onMicrosoftReAuthRequested,
+  });
 
   final Widget child;
+  final VoidCallback onMicrosoftReAuthRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -246,11 +252,13 @@ class _AccountRefreshListener extends StatelessWidget {
   }
 
   void _onRefreshStatusChanged(BuildContext context, MicrosoftAuthState state) {
-    final scaffoldMessenger = context.scaffoldMessenger;
+    void showSnackBarError(String message, {SnackBarAction? action}) => context
+        .scaffoldMessenger
+        .showSnackBarText(message, snackBarAction: action);
 
     switch (state.refreshStatus) {
       case MicrosoftRefreshAccountStatus.success:
-        scaffoldMessenger.showSnackBarText(
+        showSnackBarError(
           context.loc.accountRefreshedMessage(
             state.recentAccountOrThrow.username,
           ),
@@ -258,39 +266,35 @@ class _AccountRefreshListener extends StatelessWidget {
         return;
       case MicrosoftRefreshAccountStatus.failure:
         final exception = state.exceptionOrThrow;
-        final message = exception.getMessage(context.loc);
+        final message = exception.getUserMessage(context.loc);
 
         // Handle special errors
         switch (exception) {
           case minecraft_account_service_exceptions.MinecraftAccountRefresherException():
             switch (exception.exception) {
               case minecraft_account_refresher_exceptions.InvalidMicrosoftRefreshTokenException():
-                scaffoldMessenger.showSnackBarText(
+                showSnackBarError(
                   context.loc.sessionExpiredOrAccessRevoked,
-                  snackBarAction: SnackBarAction(
+                  action: SnackBarAction(
                     label: context.loc.signInWithMicrosoft,
-                    onPressed: () => LoginWithMicrosoftDialog.show(
-                      context,
-                      isReAuthentication: true,
-                    ),
+                    onPressed: onMicrosoftReAuthRequested,
                   ),
                 );
                 return;
               case minecraft_account_refresher_exceptions.MicrosoftReAuthRequiredException():
-                scaffoldMessenger.showSnackBarText(
+                showSnackBarError(
                   message,
-                  snackBarAction: SnackBarAction(
+                  action: SnackBarAction(
                     label: context.loc.signInWithMicrosoft,
-                    onPressed: () => LoginWithMicrosoftDialog.show(
-                      context,
-                      isReAuthentication: true,
-                    ),
+                    onPressed: onMicrosoftReAuthRequested,
                   ),
                 );
                 return;
+              case _:
+                showSnackBarError(message);
             }
           case _:
-            scaffoldMessenger.showSnackBarText(message);
+            showSnackBarError(message);
             return;
         }
 

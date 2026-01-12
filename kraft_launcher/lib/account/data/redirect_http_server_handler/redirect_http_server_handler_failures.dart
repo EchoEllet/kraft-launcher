@@ -17,6 +17,6 @@ final class PermissionDeniedFailure extends StartServerFailure {
   final String details;
 }
 
-final class UnknownFailure extends StartServerFailure {
-  const UnknownFailure(super.message);
+final class UnexpectedFailure extends StartServerFailure {
+  const UnexpectedFailure(super.message);
 }

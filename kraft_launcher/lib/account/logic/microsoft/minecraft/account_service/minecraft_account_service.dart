@@ -1,8 +1,6 @@
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api.dart';
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api_exceptions.dart'
     as microsoft_auth_api_exceptions;
-import 'package:kraft_launcher/account/data/minecraft_account_api/minecraft_account_api_exceptions.dart'
-    as minecraft_account_api_exceptions;
 import 'package:kraft_launcher/account/logic/launcher_minecraft_account/account_repository.dart';
 import 'package:kraft_launcher/account/logic/launcher_minecraft_account/minecraft_account.dart';
 import 'package:kraft_launcher/account/logic/microsoft/auth_flows/auth_code/microsoft_auth_code_flow.dart';
@@ -50,7 +48,8 @@ class MinecraftAccountService {
     )?
     onMicrosoftAuthApiException,
   }) async {
-    // TODO: The current solution is not scalable enough. Avoid using exceptions for possible failures, and only throw Dart errors (major refactor). Consider using Result pattern again?
+    // TODO: Avoid using exceptions for expected failures. Use the Result pattern.
+    //  URL: https://github.com/KraftLauncher/kraft-launcher/issues/8
     try {
       return await run();
     } on microsoft_auth_api_exceptions.MicrosoftAuthApiException catch (e) {

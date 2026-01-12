@@ -1,11 +1,15 @@
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api.dart';
-import 'package:kraft_launcher/account/data/minecraft_account_api/minecraft_account_api.dart';
 import 'package:kraft_launcher/account/logic/launcher_minecraft_account/minecraft_account.dart';
 import 'package:kraft_launcher/account/logic/microsoft/microsoft_refresh_token_expiration.dart';
 import 'package:kraft_launcher/account/logic/microsoft/minecraft/account_resolver/minecraft_account_resolver_exceptions.dart'
     as minecraft_account_resolver_exceptions;
 import 'package:kraft_launcher/common/logic/utils.dart';
 import 'package:meta/meta.dart';
+import 'package:minecraft_services_repository/minecraft_services_repository.dart'
+    hide MinecraftCosmeticState, MinecraftSkinVariant;
+import 'package:minecraft_services_repository/minecraft_services_repository.dart'
+    as minecraft_services
+    show MinecraftCosmeticState, MinecraftSkinVariant;
 
 /// Performs the necessary steps to authenticate a Microsoft account
 /// with Minecraft, including:
@@ -23,12 +27,12 @@ import 'package:meta/meta.dart';
 class MinecraftAccountResolver {
   MinecraftAccountResolver({
     required MicrosoftAuthApi microsoftAuthApi,
-    required MinecraftAccountApi minecraftAccountApi,
+    required MinecraftServicesRepository minecraftServicesRepository,
   }) : _microsoftAuthApi = microsoftAuthApi,
-       _minecraftAccountApi = minecraftAccountApi;
+       _minecraftServicesRepository = minecraftServicesRepository;
 
   final MicrosoftAuthApi _microsoftAuthApi;
-  final MinecraftAccountApi _minecraftAccountApi;
+  final MinecraftServicesRepository _minecraftServicesRepository;
 
   Future<MinecraftAccount> resolve({
     required MicrosoftOAuthTokenResponse oauthTokenResponse,
@@ -43,29 +47,42 @@ class MinecraftAccountResolver {
     final xstsTokenResponse = await _microsoftAuthApi.requestXSTSToken(
       xboxLiveTokenResponse.xboxToken,
     );
+
+    // TODO: Avoid using valueOrThrow and refactor this class to return a Result
+    //  rather than throwing exceptions. This workaround was made since other classes
+    //  are not yet refactored.
+    //  The codebase is being incrementally refactored to avoid
+    //  throwing an [Exception] and to use the Result pattern with failures.
+    //  Once this method returns a Result, all consumers must handle any failures.
+    //  This workaround is used in all methods from the [MinecraftServicesRepository].
+    //  URL: https://github.com/KraftLauncher/kraft-launcher/issues/8
     onProgress(ResolveMinecraftAccountProgress.loggingIntoMinecraft);
-    final minecraftLoginResponse = await _minecraftAccountApi
-        .loginToMinecraftWithXbox(
-          xstsToken: xstsTokenResponse.xboxToken,
+    final minecraftAuthResponse =
+        (await _minecraftServicesRepository.authenticateWithXbox(
+          xstsAccessToken: xstsTokenResponse.xboxToken,
           xstsUserHash: xstsTokenResponse.userHash,
-        );
+        )).;
 
     onProgress(ResolveMinecraftAccountProgress.checkingMinecraftJavaOwnership);
-    final ownsMinecraftJava = await _minecraftAccountApi
-        .checkMinecraftJavaOwnership(minecraftLoginResponse.accessToken);
+    final ownsMinecraftJava =
+        (await _minecraftServicesRepository.hasValidMinecraftJavaLicense(
+          accessToken: minecraftAuthResponse.accessToken,
+        )).;
 
     if (!ownsMinecraftJava) {
       throw const minecraft_account_resolver_exceptions.MinecraftJavaEntitlementAbsentException();
     }
 
     onProgress(ResolveMinecraftAccountProgress.fetchingProfile);
-    final minecraftProfileResponse = await _minecraftAccountApi
-        .fetchMinecraftProfile(minecraftLoginResponse.accessToken);
+    final minecraftProfileResponse =
+        (await _minecraftServicesRepository.fetchProfile(
+          accessToken: minecraftAuthResponse.accessToken,
+        )).;
 
     final newAccount = constructAccount(
       profileResponse: minecraftProfileResponse,
       oauthTokenResponse: oauthTokenResponse,
-      loginResponse: minecraftLoginResponse,
+      loginResponse: minecraftAuthResponse,
       ownsMinecraftJava: ownsMinecraftJava,
     );
 
@@ -79,11 +96,14 @@ class MinecraftAccountResolver {
     required MinecraftLoginResponse loginResponse,
     required bool ownsMinecraftJava,
   }) {
-    MinecraftCosmeticState toCosmeticState(MinecraftApiCosmeticState api) =>
-        switch (api) {
-          MinecraftApiCosmeticState.active => MinecraftCosmeticState.active,
-          MinecraftApiCosmeticState.inactive => MinecraftCosmeticState.inactive,
-        };
+    MinecraftCosmeticState toCosmeticState(
+      minecraft_services.MinecraftCosmeticState api,
+    ) => switch (api) {
+      minecraft_services.MinecraftCosmeticState.active =>
+        MinecraftCosmeticState.active,
+      minecraft_services.MinecraftCosmeticState.inactive =>
+        MinecraftCosmeticState.inactive,
+    };
     return MinecraftAccount(
       id: profileResponse.id,
       username: profileResponse.name,
@@ -108,8 +128,10 @@ class MinecraftAccountResolver {
               url: skin.url,
               textureKey: skin.textureKey,
               variant: switch (skin.variant) {
-                MinecraftApiSkinVariant.classic => MinecraftSkinVariant.classic,
-                MinecraftApiSkinVariant.slim => MinecraftSkinVariant.slim,
+                minecraft_services.MinecraftSkinVariant.classic =>
+                  MinecraftSkinVariant.classic,
+                minecraft_services.MinecraftSkinVariant.slim =>
+                  MinecraftSkinVariant.slim,
               },
             ),
           )

@@ -13,7 +13,7 @@ import 'package:kraft_launcher/account/logic/microsoft/minecraft/account_service
 import 'package:kraft_launcher/account/ui/microsoft_auth_cubit/microsoft_auth_cubit.dart';
 import 'package:kraft_launcher/account/ui/minecraft_java_entitlement_absent_dialog.dart';
 import 'package:kraft_launcher/account/ui/utils/auth_progress_messages.dart';
-import 'package:kraft_launcher/account/ui/utils/minecraft_account_service_exception_messages.dart';
+import 'package:kraft_launcher/account/ui/utils/minecraft_account_error_messages.dart';
 import 'package:kraft_launcher/common/constants/constants.dart';
 import 'package:kraft_launcher/common/constants/project_info_constants.dart';
 import 'package:kraft_launcher/common/ui/utils/build_context_ext.dart';
@@ -445,7 +445,7 @@ class _MicrosoftLoginListener extends StatelessWidget {
         return;
       case MicrosoftLoginStatus.failure:
         final exception = state.exceptionOrThrow;
-        final message = exception.getMessage(context.loc);
+        final message = exception.getUserMessage(context.loc);
         final scaffoldMessenger = context.scaffoldMessenger;
 
         context.pop();

@@ -4,7 +4,12 @@ import 'package:meta/meta.dart';
 abstract class BaseFailure {
   const BaseFailure(this.message);
 
-  // Used for debugging purposes and is not used in UI.
+  /// A technical message describing the failure.
+  ///
+  /// This message is intended for **debugging and logging purposes only**.
+  /// It is typically detailed and not user-friendly.
+  ///
+  /// This should not be used in the user-facing UI error message.
   final String message;
 
   @override

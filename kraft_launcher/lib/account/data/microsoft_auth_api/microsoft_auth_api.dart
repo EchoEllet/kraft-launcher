@@ -1,6 +1,3 @@
-/// @docImport 'package:kraft_launcher/account/data/minecraft_account_api/minecraft_account_api.dart';
-library;
-
 import 'package:kraft_launcher/account/data/microsoft_auth_api/auth_flows/microsoft_auth_code_flow_api.dart';
 import 'package:kraft_launcher/account/data/microsoft_auth_api/auth_flows/microsoft_device_code_flow_api.dart';
 import 'package:kraft_launcher/common/data/json.dart';
@@ -13,9 +10,7 @@ import 'package:meta/meta.dart';
 /// * `user.auth.xboxlive.com`
 /// * `xsts.auth.xboxlive.com`
 ///
-/// See also:
-///  * https://minecraft.wiki/w/Microsoft_authentication
-///  * [MinecraftAccountApi]
+/// See also: https://minecraft.wiki/w/Microsoft_authentication
 abstract interface class MicrosoftAuthApi
     implements MicrosoftAuthCodeFlowApi, MicrosoftDeviceCodeFlowApi {
   Future<XboxLiveAuthTokenResponse> requestXboxLiveToken(
@@ -30,7 +25,8 @@ abstract interface class MicrosoftAuthApi
 
 // TODO: Extract these models from this file, ensure they are close to the data source
 //  (raw data or source data rather than an app model) and map them in one place
-//  to follow Architecture. Make similar changes to all APIs, including MinecraftAccountApi and MicrosoftAuthApi
+//  to follow Architecture. Make similar changes to all APIs, including MicrosoftAuthApi.
+//  See also: https://github.com/KraftLauncher/kraft-launcher/issues/8
 
 // The success response when exchanging the auth code, device code or Microsoft
 // refresh token for Microsoft tokens.

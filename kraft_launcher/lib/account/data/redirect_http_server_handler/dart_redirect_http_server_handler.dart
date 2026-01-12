@@ -68,7 +68,7 @@ final class DartRedirectHttpServerHandler implements RedirectHttpServerHandler {
       final osError = e.osError;
       if (osError == null) {
         return Result.failure(
-          UnknownFailure('$OSError is null: ${e.message}.'),
+          UnexpectedFailure('$OSError is null: ${e.message}.'),
         );
       }
       if (_isPortInUse(osError)) {
@@ -77,7 +77,7 @@ final class DartRedirectHttpServerHandler implements RedirectHttpServerHandler {
       if (_isPermissionDenied(osError)) {
         return Result.failure(PermissionDeniedFailure(e.toString()));
       }
-      return Result.failure(UnknownFailure(e.toString()));
+      return Result.failure(UnexpectedFailure(e.toString()));
     }
   }
 
@@ -111,7 +111,8 @@ final class DartRedirectHttpServerHandler implements RedirectHttpServerHandler {
   //
   // **Note:** We were unable to reproduce this issue on
   // Windows 10/11 with Developer mode enabled/disabled.
-  // However, according to Microsoft docs: https://learn.microsoft.com/en-us/windows/win32/winsock/windows-sockets-error-codes-2
+  // Permission-denied detection on Windows uses the error codes documented by Microsoft:
+  // https://learn.microsoft.com/en-us/windows/win32/winsock/windows-sockets-error-codes-2
   bool _isPermissionDenied(OSError osError) {
     final message = osError.message.toLowerCase();
 

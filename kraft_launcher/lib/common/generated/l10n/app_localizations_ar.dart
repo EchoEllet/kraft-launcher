@@ -111,6 +111,21 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get unexpectedFailureMessage => 'Something went wrong. Please try again.';
+
+  @override
+  String get minecraftServicesLoginUnhandledServerResponse => 'Login failed due to an error from Minecraft services. Please try again.';
+
+  @override
+  String get minecraftServicesLoginInternalServerError => 'Login failed due to an internal server error from Minecraft services. Please try again.';
+
+  @override
+  String get minecraftServicesLoginUnexpectedResponseDataStructure => 'Login failed due to an unexpected response structure from Minecraft services. Please make sure the launcher is up to date and try again.';
+
+  @override
+  String get minecraftServicesLoginInvalidResponse => 'Login failed due to an invalid response from Minecraft services. Please try again later.';
+
+  @override
   String get missingAuthCodeError => 'لم يتم توفير رمز التفويض. يجب إعادة بدء تسجيل الدخول.';
 
   @override
@@ -301,11 +316,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get minecraftRequestLimitError => 'تم الوصول إلى حد الطلب أثناء التواصل مع خوادم ماينكرافت. يرجى المحاولة لاحقًا.';
 
   @override
-  String unexpectedMinecraftApiError(Object message) {
-    return 'حدث خطأ غير متوقع أثناء التواصل مع خوادم ماينكرافت: $message. يرجى المحاولة لاحقًا.';
-  }
-
-  @override
   String unexpectedMicrosoftApiError(Object message) {
     return 'حدث خطأ غير متوقع أثناء التواصل مع خوادم مايكروسوفت: $message. يرجى المحاولة لاحقًا.';
   }
@@ -459,7 +469,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get updateMicrosoftAccount => 'Update Microsoft Account';
 
   @override
-  String get minecraftAccountApiUnavailable => 'Minecraft services are currently unavailable. Please try again in a few minutes.';
+  String get minecraftServicesApiUnavailable => 'Minecraft services are currently unavailable. Please try again in a few minutes.';
 
   @override
   String authCodeServerStartFailurePortInUse(int port) {
@@ -467,12 +477,17 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String authCodeServerStartFailurePermissionDenied(String details) {
-    return 'Unable to start the local server required for login due to system restrictions: $details';
-  }
+  String get authCodeServerStartFailurePermissionDenied => 'Unable to start the local server required for login due to system restrictions.';
 
   @override
-  String authCodeServerStartFailureUnknown(String message) {
-    return 'Unable to start the local server required for login due to an unexpected error: $message';
-  }
+  String get authCodeServerStartFailureUnexpected => 'Unable to start the local server required for login due to an unexpected error.';
+
+  @override
+  String get connectionFailure => 'Connection failed. Please check your internet connection and try again.';
+
+  @override
+  String get showErrorDetailsButton => 'Show details';
+
+  @override
+  String get technicalErrorDetailsDialogTitle => 'Technical details';
 }

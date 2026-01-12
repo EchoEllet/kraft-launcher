@@ -1,7 +1,12 @@
+// TODO: IMPORTANT_TO_FIX Fix the issue of having to import api_client, http and minecraft_services_client deps
+//  just to create an instance of something. We want full decoupling from these,
+//  we should not add them to pubspec.yaml of this app package!
+import 'package:api_client/api_client.dart' show ApiClient, HttpApiClient;
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http show Client;
 import 'package:image_picker/image_picker.dart';
 import 'package:kraft_launcher/account/data/image_cache_service/default_image_cache_service.dart';
 import 'package:kraft_launcher/account/data/image_cache_service/image_cache_service.dart';
@@ -11,8 +16,6 @@ import 'package:kraft_launcher/account/data/linux_secret_service/dbus_linux_secr
 import 'package:kraft_launcher/account/data/linux_secret_service/linux_secret_service_checker.dart';
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api.dart';
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api_impl.dart';
-import 'package:kraft_launcher/account/data/minecraft_account_api/minecraft_account_api.dart';
-import 'package:kraft_launcher/account/data/minecraft_account_api/minecraft_account_api_impl.dart';
 import 'package:kraft_launcher/account/data/redirect_http_server_handler/dart_redirect_http_server_handler.dart';
 import 'package:kraft_launcher/account/data/redirect_http_server_handler/redirect_http_server_handler.dart';
 import 'package:kraft_launcher/account/logic/launcher_minecraft_account/account_repository.dart';
@@ -32,6 +35,9 @@ import 'package:kraft_launcher/settings/data/settings_file_storage.dart';
 import 'package:kraft_launcher/settings/logic/settings_repository.dart';
 import 'package:kraft_launcher/settings/ui/cubit/settings_cubit.dart';
 import 'package:meta/meta.dart';
+import 'package:minecraft_services_client/minecraft_services_client.dart'
+    show HttpMinecraftServicesApiClient, MinecraftServicesApiClient;
+import 'package:minecraft_services_repository/minecraft_services_repository.dart';
 // Provider is used for dependency injection, not state management.
 // ignore: depend_on_referenced_packages
 import 'package:provider/provider.dart'
@@ -71,6 +77,11 @@ class _CommonProviders extends StatelessWidget {
           create: (context) => DioFactory.newClient(),
           dispose: (_, value) => value.close(),
         ),
+        Provider<http.Client>(
+          create: (context) => http.Client(),
+          dispose: (context, value) => value.close(),
+        ),
+        Provider<ApiClient>(create: (context) => HttpApiClient(context.read())),
       ],
       child: child,
     );
@@ -104,10 +115,16 @@ class _AccountFeatureProviders extends _FeatureProviders {
       Provider<MicrosoftAuthApi>(
         create: (context) => MicrosoftAuthApiImpl(dio: context.read()),
       ),
-      Provider<MinecraftAccountApi>(
-        create: (context) => MinecraftAccountApiImpl(dio: context.read()),
+      Provider<MinecraftServicesApiClient>(
+        create: (context) => HttpMinecraftServicesApiClient(
+          apiClient: context.read<ApiClient>(),
+        ),
       ),
-
+      Provider<MinecraftServicesRepository>(
+        create: (context) => DefaultMinecraftServicesRepository(
+          apiClient: context.read<MinecraftServicesApiClient>(),
+        ),
+      ),
       Provider<ImageCacheService>(
         create: (context) => DefaultImageCacheService(),
       ),
@@ -149,7 +166,7 @@ class _AccountFeatureProviders extends _FeatureProviders {
       Provider<MinecraftAccountResolver>(
         create: (context) => MinecraftAccountResolver(
           microsoftAuthApi: context.read(),
-          minecraftAccountApi: context.read(),
+          minecraftServicesRepository: context.read(),
         ),
       ),
       Provider(
@@ -174,7 +191,7 @@ class _AccountFeatureProviders extends _FeatureProviders {
         create: (context) => MinecraftAccountRefresher(
           imageCacheService: context.read(),
           microsoftAuthApi: context.read(),
-          minecraftAccountApi: context.read(),
+          minecraftServicesRepository: context.read(),
           accountResolver: context.read(),
         ),
       ),

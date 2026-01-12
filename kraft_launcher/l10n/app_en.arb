@@ -52,7 +52,7 @@
     "removeAccount": "Remove Account",
     "unexpectedError": "Unexpected error: {message}.",
     "@unexpectedError": {
-        "description": "Fallback error message for unexpected errors during any operation.",
+        "description": "(DEPRECATED, use unexpectedFailureMessage instead) Fallback error message for unexpected errors during any operation.",
         "placeholders": {
             "message": {
                 "type": "String",
@@ -61,6 +61,14 @@
             }
         }
     },
+    "unexpectedFailureMessage": "Something went wrong. Please try again.",
+    "@unexpectedFailureMessage": {
+        "description": "Fallback message shown to the user when an unexpected exception occurs that was not specifically handled. This is not meant to indicate a bug in the app, but to provide a generic, user-friendly message for recoverable issues or unknown exceptions."
+    },
+    "minecraftServicesLoginUnhandledServerResponse": "Login failed due to an error from Minecraft services. Please try again.",
+    "minecraftServicesLoginInternalServerError": "Login failed due to an internal server error from Minecraft services. Please try again.",
+    "minecraftServicesLoginUnexpectedResponseDataStructure": "Login failed due to an unexpected response structure from Minecraft services. Please make sure the launcher is up to date and try again.",
+    "minecraftServicesLoginInvalidResponse": "Login failed due to an invalid response from Minecraft services. Please try again later.",
     "missingAuthCodeError": "Auth code not provided. Sign-in must be restarted.",
     "@missingAuthCodeError": {
         "description": "Shown when the login process is redirected without a 'code' parameter, indicating that the Microsoft authorization code is missing or was manually accessed."
@@ -164,7 +172,6 @@
     "reportBug": "Report Bug",
     "unknownErrorWhileLoadingAccounts": "An unknown error occurred while loading the accounts. Please try again later.",
     "minecraftRequestLimitError": "Request limit reached while communicating with Minecraft servers. Please try again shortly.",
-    "unexpectedMinecraftApiError": "Unexpected error while communicating with Minecraft servers: {message}. Please try again later.",
     "unexpectedMicrosoftApiError": "Unexpected error while communicating with Microsoft servers: {message}. Please try again later.",
     "errorLoadingNetworkImage": "An error occurred while loading the image: {message}",
     "skinModelClassic": "Classic",
@@ -319,8 +326,8 @@
         "description": "Displayed when the user's operating system does not support secure storage. Account tokens will be saved unencrypted in a local file, increasing the risk of unauthorized access. Users should be cautious with installed programs and mods."
     },
     "updateMicrosoftAccount": "Update Microsoft Account",
-    "minecraftAccountApiUnavailable": "Minecraft services are currently unavailable. Please try again in a few minutes.",
-    "@minecraftAccountApiUnavailable": {
+    "minecraftServicesApiUnavailable": "Minecraft services are currently unavailable. Please try again in a few minutes.",
+    "@minecraftServicesApiUnavailable": {
         "description": "Shown when a request to api.minecraftservices.com fails with a 503 Service Unavailable response. Indicates that Minecraft services are temporarily unavailable during communication with the API, such as login or other account-related operations."
     },
     "authCodeServerStartFailurePortInUse": "Unable to start the local server required for login. Port {port} is already in use.",
@@ -334,26 +341,24 @@
             }
         }
     },
-    "authCodeServerStartFailurePermissionDenied": "Unable to start the local server required for login due to system restrictions: {details}",
+    "authCodeServerStartFailurePermissionDenied": "Unable to start the local server required for login due to system restrictions.",
     "@authCodeServerStartFailurePermissionDenied": {
-        "description": "Shown when the local HTTP server used to receive Microsoft's redirect cannot start because the operating system denied permission. This can be caused by firewall rules, antivirus software, admin restrictions, or security policies.",
-        "placeholders": {
-            "details": {
-                "type": "String",
-                "example": "Permission denied (EACCES)",
-                "description": "The system-level error message explaining why permission was denied."
-            }
-        }
+        "description": "Shown when the local HTTP server used to receive Microsoft's redirect cannot start because the operating system denied permission. This can be caused by firewall rules, antivirus software, admin restrictions, or security policies."
     },
-    "authCodeServerStartFailureUnknown": "Unable to start the local server required for login due to an unexpected error: {message}",
-    "@authCodeServerStartFailureUnknown": {
-        "description": "Shown when the local HTTP server, used to receive Microsoft's redirect after sign-in, fails to start due to an unknown or unclassified error.",
-        "placeholders": {
-            "message": {
-                "type": "String",
-                "example": "SocketException: Failed to bind to port",
-                "description": "The raw error message returned by the system or runtime."
-            }
-        }
+    "authCodeServerStartFailureUnexpected": "Unable to start the local server required for login due to an unexpected error.",
+    "@authCodeServerStartFailureUnexpected": {
+        "description": "Shown when the local HTTP server, used to receive Microsoft's redirect after sign-in, fails to start due to an unknown or unclassified error."
+    },
+    "connectionFailure": "Connection failed. Please check your internet connection and try again.",
+    "@connectionFailure": {
+        "description": "Shown to the user when the app cannot reach the internet or server due to network issues."
+    },
+    "showErrorDetailsButton": "Show details",
+    "@showErrorDetailsButton": {
+        "description": "Label for a button shown when an unclear error occurs (e.g., connection failures) and the technical details are not user-friendly. Tapping this button opens a dialog displaying the full technical error details."
+    },
+    "technicalErrorDetailsDialogTitle": "Technical details",
+    "@technicalErrorDetailsDialogTitle": {
+        "description": "Title of the dialog that shows detailed technical information about an expected error for debugging or reporting purposes"
     }
 }

@@ -2,15 +2,16 @@ import 'package:kraft_launcher/account/data/image_cache_service/image_cache_serv
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api.dart';
 import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_api_exceptions.dart'
     as microsoft_auth_api_exceptions;
-import 'package:kraft_launcher/account/data/minecraft_account_api/minecraft_account_api.dart';
 import 'package:kraft_launcher/account/logic/launcher_minecraft_account/minecraft_account.dart';
 import 'package:kraft_launcher/account/logic/microsoft/microsoft_refresh_token_expiration.dart';
 import 'package:kraft_launcher/account/logic/microsoft/minecraft/account_refresher/minecraft_account_refresher_exceptions.dart'
-    as minecraft_account_refresher_exceptions;
+    as refresher;
 import 'package:kraft_launcher/account/logic/microsoft/minecraft/account_resolver/minecraft_account_resolver.dart';
 import 'package:kraft_launcher/account/logic/minecraft_skin_ext.dart';
 import 'package:kraft_launcher/common/logic/utils.dart';
 import 'package:meta/meta.dart';
+import 'package:minecraft_services_repository/minecraft_services_repository.dart';
+import 'package:result/result.dart';
 
 /// Handles the token refresh flow for Microsoft-based Minecraft
 /// accounts authenticated via Microsoft OAuth.
@@ -21,16 +22,19 @@ import 'package:meta/meta.dart';
 /// Stateless and pure; does not cache or persist any data.
 class MinecraftAccountRefresher {
   MinecraftAccountRefresher({
-    required this.imageCacheService,
-    required this.microsoftAuthApi,
-    required this.minecraftAccountApi,
-    required this.accountResolver,
-  });
+    required ImageCacheService imageCacheService,
+    required MicrosoftAuthApi microsoftAuthApi,
+    required MinecraftServicesRepository minecraftServicesRepository,
+    required MinecraftAccountResolver accountResolver,
+  }) : _imageCacheService = imageCacheService,
+       _microsoftAuthApi = microsoftAuthApi,
+       _accountResolver = accountResolver,
+       _minecraftServicesRepository = minecraftServicesRepository;
 
-  final ImageCacheService imageCacheService;
-  final MicrosoftAuthApi microsoftAuthApi;
-  final MinecraftAccountApi minecraftAccountApi;
-  final MinecraftAccountResolver accountResolver;
+  final ImageCacheService _imageCacheService;
+  final MicrosoftAuthApi _microsoftAuthApi;
+  final MinecraftServicesRepository _minecraftServicesRepository;
+  final MinecraftAccountResolver _accountResolver;
 
   Future<MinecraftAccount> refreshMicrosoftAccount(
     MinecraftAccount account, {
@@ -64,14 +68,14 @@ class MinecraftAccountRefresher {
       onRefreshProgress(
         RefreshMinecraftAccountProgress.refreshingMicrosoftTokens,
       );
-      final oauthTokenResponse = await microsoftAuthApi
+      final oauthTokenResponse = await _microsoftAuthApi
           .getNewTokensFromRefreshToken(microsoftRefreshToken);
 
       // Delete current cached skin images.
-      await imageCacheService.evictFromCache(account.headSkinImageUrl);
-      await imageCacheService.evictFromCache(account.fullSkinImageUrl);
+      await _imageCacheService.evictFromCache(account.headSkinImageUrl);
+      await _imageCacheService.evictFromCache(account.fullSkinImageUrl);
 
-      return await accountResolver.resolve(
+      return await _accountResolver.resolve(
         oauthTokenResponse: oauthTokenResponse,
         onProgress: onResolveAccountProgress,
       );
@@ -81,16 +85,13 @@ class MinecraftAccountRefresher {
           reauthRequiredReason: MicrosoftReauthRequiredReason.accessRevoked,
         ),
       );
-      throw minecraft_account_refresher_exceptions.InvalidMicrosoftRefreshTokenException(
-        updatedAccount,
-      );
+      throw refresher.InvalidMicrosoftRefreshTokenException(updatedAccount);
     }
   }
 
   // Refreshes a Microsoft account if the Minecraft access token is expired.
   // TODO: More consideration is needed, test it with skin update feature first.
   //  Manually test handling of Microsoft refresh token expiration
-
   @experimental
   Future<MinecraftAccount> refreshMinecraftAccessTokenIfExpired(
     MinecraftAccount account, {
@@ -119,43 +120,51 @@ class MinecraftAccountRefresher {
       onRefreshProgress(
         RefreshMinecraftAccessTokenProgress.refreshingMicrosoftTokens,
       );
-      final response = await microsoftAuthApi.getNewTokensFromRefreshToken(
-        microsoftRefreshToken,
-      );
+      final microsoftRefreshResponse = await _microsoftAuthApi
+          .getNewTokensFromRefreshToken(microsoftRefreshToken);
 
-      // TODO: Part of  MinecraftAccountResolver logic (Xbox → XSTS → Login)
+      // TODO: Part of MinecraftAccountResolver logic (Xbox → XSTS → Login)
       //  is duplicated in here just to avoid the full profile resolution.
       //  We may need to refactor some of the code for a better solution.
 
       onRefreshProgress(
         RefreshMinecraftAccessTokenProgress.requestingXboxToken,
       );
-      final xboxResponse = await microsoftAuthApi.requestXboxLiveToken(
-        response.accessToken,
+      final xboxResponse = await _microsoftAuthApi.requestXboxLiveToken(
+        microsoftRefreshResponse.accessToken,
       );
 
       onRefreshProgress(
         RefreshMinecraftAccessTokenProgress.requestingXstsToken,
       );
-      final xstsTokenResponse = await microsoftAuthApi.requestXSTSToken(
+      final xstsTokenResponse = await _microsoftAuthApi.requestXSTSToken(
         xboxResponse.xboxToken,
       );
 
       onRefreshProgress(
         RefreshMinecraftAccessTokenProgress.loggingIntoMinecraft,
       );
-      final loginResponse = await minecraftAccountApi.loginToMinecraftWithXbox(
-        xstsToken: xstsTokenResponse.xboxToken,
-        xstsUserHash: xstsTokenResponse.userHash,
-      );
+      final xboxAuthResult = await _minecraftServicesRepository
+          .authenticateWithXbox(
+            xstsAccessToken: xstsTokenResponse.xboxToken,
+            xstsUserHash: xstsTokenResponse.userHash,
+          );
+      final minecraftLoginResponse = switch (xboxAuthResult) {
+        SuccessResult(:final value) => value,
+        FailureResult(:final failure) =>
+          // Throw an exception for backward compatibility reasons.
+          // See WrappedMinecraftServicesException for more info.
+          throw refresher.WrappedMinecraftServicesException(failure),
+      };
+
       final refreshedAccount = account.copyWith(
         microsoftAccountInfo: microsoftAccountInfo.copyWith(
           minecraftAccessToken: ExpirableToken(
-            value: loginResponse.accessToken,
-            expiresAt: expiresInToExpiresAt(loginResponse.expiresIn),
+            value: minecraftLoginResponse.accessToken,
+            expiresAt: expiresInToExpiresAt(minecraftLoginResponse.expiresIn),
           ),
           microsoftRefreshToken: ExpirableToken(
-            value: response.refreshToken,
+            value: microsoftRefreshResponse.refreshToken,
             expiresAt: microsoftRefreshTokenExpiresAt(),
           ),
         ),
@@ -170,9 +179,7 @@ class MinecraftAccountRefresher {
     final reAuthRequiredReason =
         account.microsoftAccountInfo?.reauthRequiredReason;
     if (reAuthRequiredReason != null) {
-      throw minecraft_account_refresher_exceptions.MicrosoftReAuthRequiredException(
-        reAuthRequiredReason,
-      );
+      throw refresher.MicrosoftReAuthRequiredException(reAuthRequiredReason);
     }
     // NOTE: Microsoft refresh token expiration (after 90 days) is checked when loading accounts.
     // In rare cases, a token might expire shortly after loading but before use.

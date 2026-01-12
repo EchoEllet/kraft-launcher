@@ -6,6 +6,7 @@ import 'package:kraft_launcher/account/data/microsoft_auth_api/microsoft_auth_ap
     as microsoft_auth_api_exceptions;
 import 'package:kraft_launcher/account/logic/launcher_minecraft_account/minecraft_account.dart';
 import 'package:meta/meta.dart';
+import 'package:minecraft_services_repository/minecraft_services_repository.dart';
 
 @immutable
 sealed class MinecraftAccountRefresherException implements Exception {
@@ -39,4 +40,21 @@ final class MicrosoftReAuthRequiredException
     : super('Microsoft Re-authentication is required. Reason: ${reason.name}');
 
   final MicrosoftReauthRequiredReason reason;
+}
+
+/// Wraps a [MinecraftServicesFailure] inside this exception for backward
+/// compatibility.
+///
+/// The codebase is being incrementally refactored to avoid throwing an [Exception]
+/// and to use the Result pattern with failures. See also:
+/// https://github.com/KraftLauncher/kraft-launcher/issues/8
+///
+/// This class primarily exists to handle a [MinecraftServicesFailure] that was
+/// caught and then rethrown as an exception instead of breaking the existing
+/// method signature.
+final class WrappedMinecraftServicesException
+    extends MinecraftAccountRefresherException {
+  WrappedMinecraftServicesException(this.wrapped) : super(wrapped.message);
+
+  final MinecraftServicesFailure wrapped;
 }
